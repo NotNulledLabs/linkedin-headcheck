@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html><body>
+<!-- Test fixture. Each profile is crafted to exercise a specific branch
+     of the extractor and scoring logic. Do NOT edit casually — the tests
+     assert specific fields per profile, keyed by slug.
+-->
+
+<!-- profile-1: textbook perfect — photo loaded, custom slug, headline
+     with employer reference, 3 mutuals (Spanish UI). Should score 9/green. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-1"
+     href="https://www.linkedin.com/in/alice-johnson?trk=people">
+    <img src="https://media.licdn.com/dms/image/v2/alice.jpg" class="evi-image lazy-image"/>
+  </a>
+  <div class="t-black">Alice Johnson</div>
+  <div class="artdeco-entity-lockup__subtitle">Senior Engineer at Acme Corp</div>
+  <span class="lt-line-clamp--multi-line t-12">3 mutual connections</span>
+</div>
+
+<!-- profile-2: ghost-person (lazy-loaded, not really a ghost profile).
+     Should score 7/green (2 for slug, 1 for photo-unknown, 1 hl, 1 empl_ref, 2 for 1 mutual).
+     Critically: NOT red. This is the bug-fix regression test. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-2"
+     href="https://www.linkedin.com/in/bob-smith">
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+         class="evi-image lazy-image ghost-person"/>
+  </a>
+  <div class="t-black">Bob Smith</div>
+  <div class="artdeco-entity-lockup__subtitle">Motorist la Acme Corp</div>
+  <span class="lt-line-clamp--multi-line t-12">1 mutual connection</span>
+</div>
+
+<!-- profile-3: genuine ghost. No img tag at all. Should force red. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-3"
+     href="https://www.linkedin.com/in/ACoAAABCDEF1234567">
+  </a>
+  <div class="t-black">user_9999</div>
+  <div class="artdeco-entity-lockup__subtitle"></div>
+</div>
+
+<!-- profile-4: Spanish mutual count, non-ASCII name, loaded photo.
+     Should hit the "5 conexiones en común" → mutual_level=2 path. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-4"
+     href="https://www.linkedin.com/in/maria-garcia">
+    <img src="https://media.licdn.com/dms/image/v2/maria.jpg" class="evi-image"/>
+  </a>
+  <div class="t-black">María García</div>
+  <div class="artdeco-entity-lockup__subtitle">Directora de Marketing en Acme Corp</div>
+  <span class="lt-line-clamp--multi-line t-12">5 conexiones en común</span>
+</div>
+
+<!-- profile-5: CJK name (previously flagged as suspicious). -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-5"
+     href="https://www.linkedin.com/in/li-ming">
+    <img src="https://media.licdn.com/dms/image/v2/liming.jpg" class="evi-image"/>
+  </a>
+  <div class="t-black">李明</div>
+  <div class="artdeco-entity-lockup__subtitle">Software Engineer at Acme Corp</div>
+  <span class="lt-line-clamp--multi-line t-12">2 mutual connections</span>
+</div>
+
+<!-- profile-6: duplicate of profile-1, different tracking param — must be dedup'd. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-6"
+     href="https://www.linkedin.com/in/alice-johnson?trk=other">
+    <img src="https://media.licdn.com/alice.jpg" class="evi-image"/>
+  </a>
+  <div class="t-black">Alice Johnson</div>
+  <div class="artdeco-entity-lockup__subtitle">Senior Engineer</div>
+</div>
+
+<!-- profile-7: XSS attempt — name has <script> tag as literal text. -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-7"
+     href="https://www.linkedin.com/in/evil-user">
+    <img src="https://media.licdn.com/evil.jpg" class="evi-image"/>
+  </a>
+  <div class="t-black">&lt;script&gt;alert('XSS')&lt;/script&gt;</div>
+  <div class="artdeco-entity-lockup__subtitle">"onmouseover="alert(1)"</div>
+</div>
+
+<!-- profile-8: suspicious-name patterns (digits). -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-8"
+     href="https://www.linkedin.com/in/user123">
+    <img src="https://media.licdn.com/user123.jpg" class="evi-image"/>
+  </a>
+  <div class="t-black">user_4892</div>
+  <div class="artdeco-entity-lockup__subtitle">Consultant</div>
+</div>
+</body></html>

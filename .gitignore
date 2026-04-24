@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Test artefacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Reports contain personal data — do not commit
+headcheck_*.html
+headcheck_*.pdf
+headcheck_*.xlsx
+headcheck_*.json
+headcheck_*_suspects.csv
+headcheck_*_diff.csv
+
+# Payroll files are confidential — never commit
+payroll.*
+nomina.*
+staff.*
+employees.*
+*_payroll.*
+*_nomina.*
+
+# LinkedIn HTML snapshots may contain session data
+people.html
+linkedin_*.html

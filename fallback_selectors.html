@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html><body>
+<!-- Fixture simulating a hypothetical LinkedIn UI refresh where:
+     - `t-black` is gone, replaced by `artdeco-entity-lockup__title` for names
+     - `lt-line-clamp--multi-line t-12` is gone, replaced by `entity-result__simple-insight-text`
+     The extractor's fallback chain should still find names and mutuals.
+
+     The card container class is kept as-is because it's used to anchor
+     the parent lookup; refactoring that too is a separate concern.
+-->
+
+<!-- fallback-1: fallback-level name + fallback-level mutual caption -->
+<div class="org-people-profile-card__profile-info">
+  <a id="org-people-profile-card__profile-image-1"
+     href="https://www.linkedin.com/in/alice-fallback">
+    <img src="https://media.licdn.com/alice.jpg" class="evi-image"/>
+  </a>
+  <div class="artdeco-entity-lockup__title">Alice Fallback</div>
+  <div class="artdeco-entity-lockup__subtitle">Senior Engineer at Acme Corp</div>
+  <span class="entity-result__simple-insight-text">2 mutual connections</span>
+</div>
+</body></html>

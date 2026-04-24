@@ -1,0 +1,8 @@
+# Optional dependencies for the interactive wizard (`python headcheck.py`
+# with no arguments) and the pretty diff output. The CLI with flags works
+# without these.
+questionary>=2.0.0
+rich>=13.0.0
+
+# Test suite. Not required to run HeadCheck.
+pytest>=7.0.0
