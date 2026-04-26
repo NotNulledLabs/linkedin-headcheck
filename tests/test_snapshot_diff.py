@@ -68,7 +68,7 @@ class TestSnapshotExport:
     def test_loading_non_snapshot_fails(self, tmp_path):
         bad = tmp_path / "not_a_snapshot.json"
         bad.write_text(json.dumps({"foo": "bar"}))
-        with pytest.raises(SystemExit):
+        with pytest.raises(ValueError, match="HeadCheck snapshot"):
             _load_snapshot(str(bad))
 
 

@@ -83,6 +83,8 @@ The tool analyses that snapshot, scores each profile based on publicly visible s
 | 4 – 6 | 🟡 Needs review | Partial profile — manual HR check recommended |
 | 0 – 3 | 🔴 High risk | Minimal or photoless profile — HR priority |
 
+The thresholds (`RISK_GREEN_MIN`, `RISK_YELLOW_MIN`) live in `headcheck/scoring.py`. Adjusting them updates every report consistently.
+
 ### Photo States — The Critical Distinction
 
 LinkedIn uses a 1×1 transparent GIF as a placeholder for any image that has not yet loaded. HeadCheck distinguishes three states:
@@ -91,7 +93,7 @@ LinkedIn uses a 1×1 transparent GIF as a placeholder for any image that has not
 - **Not loaded** — the image is still in lazy-load state (either the `ghost-person` CSS class or the placeholder GIF is present). **This is treated as unknown, not as a red flag**, because it reflects the export process — not the profile. If many profiles show this state, HeadCheck shows an export-quality warning and asks you to re-export scrolling more slowly.
 - **Absent** — there is genuinely no image tag, or its source is empty. Only this state forces Red.
 
-**Prior versions (≤ 1.2.0) incorrectly treated lazy-loaded photos as absent, producing false-positive reds.** Version 1.3.0 fixed this. If you see very different numbers after upgrading, that's why.
+Every report (HTML, PDF, XLSX, CSV) reflects this tri-state classification consistently as of 2.0.1.
 
 ### Understanding "Needs Review" — It Doesn't Mean Suspicious
 
@@ -112,13 +114,13 @@ In addition to scoring individual profiles, HeadCheck evaluates the export itsel
 | Many photos not loaded | ≥ 10 % of profiles have ghost-person placeholders | Re-open the People page and scroll slowly to the bottom so every photo has time to load, then re-export |
 | Low mutual coverage | < 20 % of profiles show any mutual connections | Have a non-admin employee with broad internal connections do the export from their own LinkedIn session |
 
-Warnings are informational. The report is still generated; scores that depend on these signals are simply less reliable.
+The thresholds are named constants in `headcheck/pipeline.py` (`_LAZY_PHOTO_WARN_THRESHOLD`, `_LOW_MUTUAL_WARN_THRESHOLD`). Warnings are informational; the report is still generated.
 
 ---
 
 ## Output Files
 
-Each run produces five files:
+Each run produces five files in `./output/` (configurable with `--out`):
 
 | File | Purpose |
 |---|---|
@@ -131,6 +133,36 @@ Each run produces five files:
 ---
 
 <img width="695" height="349" alt="image" src="https://github.com/user-attachments/assets/30dfc29e-1561-40c1-b748-5a6bba959d32" />
+
+## Project Structure
+
+```
+headcheck/
+├── __init__.py        # public API surface — `from headcheck import run_headcheck, …`
+├── __main__.py        # entry point for `python -m headcheck`
+├── constants.py       # version, brand strings, photo states, stage names, slugify()
+├── scoring.py         # count_mutual, is_suspicious_name, _score, _risk, RISK_*_MIN
+├── parsing.py         # extract_profiles + cascading DOM selectors + _EMPLOYER_REF_RE
+├── payroll.py         # load_payroll, column auto-detect, cross-reference
+├── pipeline.py        # run_headcheck (the public entry point) + warnings
+├── cli.py             # argparse main + diff subcommand
+├── tui.py             # interactive wizard (questionary + rich)
+└── reports/
+    ├── html.py        # interactive HTML report
+    ├── pdf.py         # executive PDF
+    ├── xlsx.py        # Excel workbook for HR
+    ├── suspects.py    # red+yellow CSV
+    └── snapshot.py    # JSON snapshot + diff helpers
+
+headcheck.py           # backward-compatible launcher (3-line shim)
+install.sh             # one-shot setup for Linux/macOS
+tests/                 # 129 pytest tests, runs in ~3.5s
+sample_payroll.csv     # example payroll for testing
+```
+
+The `headcheck.py` launcher in the repo root means `python headcheck.py …` keeps working exactly as before. You can also use `python -m headcheck …` once the package is on your `PYTHONPATH`.
+
+---
 
 ## Dependencies
 
@@ -158,17 +190,34 @@ pip install -r requirements.txt
 | `rich` | ≥ 13.0 | Colour-coded progress, tables and diff output |
 | `pytest` | ≥ 7.0 | Running the regression test suite |
 
-These are listed in `requirements-dev.txt`. Install separately if you want the wizard or to run tests:
-
-```bash
-pip install -r requirements-dev.txt
-```
+These are listed in `requirements-dev.txt`.
 
 **Python 3.10 or higher required.** No browser drivers, no Selenium, no Playwright, no external APIs.
 
 ---
 
 ## Installation and Running the Script
+
+### Quick install (Linux / macOS)
+
+If you're on Linux or macOS and just want to get going:
+
+```bash
+git clone https://github.com/NotNulledLabs/linkedin-headcheck.git
+cd linkedin-headcheck
+./install.sh
+```
+
+`install.sh` checks that you have Python 3.10+, creates a `.venv` virtual environment, installs the runtime dependencies, and optionally installs the dev dependencies (interactive wizard + tests). It's idempotent — safe to re-run.
+
+After it finishes:
+
+```bash
+source .venv/bin/activate
+python headcheck.py
+```
+
+For Windows or for the manual steps, read on.
 
 ### Option 1 — Run Locally (Recommended)
 
@@ -179,8 +228,8 @@ Running locally means installing Python on your own computer and running the scr
 Download Python from [python.org](https://www.python.org/downloads/). Choose version 3.10 or higher.
 
 - **Windows:** Run the installer. Make sure to check **"Add Python to PATH"** during installation.
-- **macOS:** Python comes pre-installed on modern Macs. To check: open Terminal and run `python3 --version`. If it shows 3.10 or higher, you are ready.
-- **Linux:** Use your package manager: `sudo apt install python3 python3-pip`
+- **macOS:** Python comes pre-installed on modern Macs. To check: open Terminal and run `python3 --version`.
+- **Linux:** Use your package manager: `sudo apt install python3 python3-pip`, `sudo pacman -S python python-pip`, etc.
 
 **Step 2 — Download HeadCheck**
 
@@ -193,15 +242,20 @@ Or download the ZIP from GitHub and extract it.
 
 **Step 3 — Install dependencies**
 
+On most Linux distributions and macOS, the recommended approach is to use a virtual environment:
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-dev.txt   # optional: questionary, rich, pytest
 ```
 
-On some systems you may need to use `pip3` instead of `pip`.
+On Windows the activate command is `.venv\Scripts\activate`.
 
 **Step 4 — Run the script**
 
-Two ways to run it:
+Three ways to run it:
 
 **Interactive wizard (easiest):**
 
@@ -209,17 +263,21 @@ Two ways to run it:
 python headcheck.py
 ```
 
-With no arguments the script asks you for the HTML path, company name, optional payroll, language and output directory. Best for IT staff who prefer a guided flow.
-
 **With flags (for scripting):**
 
 ```bash
 python headcheck.py --html people.html --company "Acme Corp"
 ```
 
+**Or as a Python module:**
+
+```bash
+python -m headcheck --html people.html --company "Acme Corp"
+```
+
 <img width="1225" height="652" alt="image" src="https://github.com/user-attachments/assets/28cfcd7e-92bd-4b24-892a-4ea0ce00a70f" />
 
-The output files will appear in the same folder (or in `--out` if specified).
+The output files will appear in `./output/` (or in the path you pass with `--out`).
 
 ---
 
@@ -233,15 +291,13 @@ Go to [colab.research.google.com](https://colab.research.google.com) and create 
 
 **Step 2 — Install dependencies**
 
-In the first cell, paste and run:
-
 ```python
 !pip install beautifulsoup4 reportlab thefuzz python-levenshtein openpyxl -q
 ```
 
 **Step 3 — Upload the script and your HTML file**
 
-Click the folder icon on the left sidebar → upload `headcheck.py` and your `people.html`.
+Click the folder icon on the left sidebar → upload the entire `headcheck/` package folder, the `headcheck.py` launcher, and your `people.html`.
 
 **Step 4 — Run**
 
@@ -251,36 +307,20 @@ Click the folder icon on the left sidebar → upload `headcheck.py` and your `pe
 
 **Step 5 — Download the output files**
 
-The generated files will appear in the file browser on the left. Right-click each one and select "Download".
+The generated files will appear in `./output/`. Right-click each one and select "Download".
 
 ---
 
 ### Option 3 — Run on a Remote Server (Advanced)
 
-If you want to run HeadCheck on a cloud server (e.g. AWS, DigitalOcean, any Linux VPS):
-
 ```bash
-# SSH into your server
 ssh user@your-server
-
-# Install Python if needed
 sudo apt update && sudo apt install python3 python3-pip git -y
-
-# Clone the repo
 git clone https://github.com/NotNulledLabs/linkedin-headcheck.git
 cd linkedin-headcheck
-
-# Install dependencies
-pip3 install -r requirements.txt
-
-# Upload your people.html via scp from your local machine:
-# scp people.html user@your-server:~/linkedin-headcheck/
-
-# Run
-python3 headcheck.py --html people.html --company "Acme Corp" --out ./reports
-
-# Download the results:
-# scp user@your-server:~/linkedin-headcheck/reports/* ./local-folder/
+./install.sh                                  # or follow the manual venv steps
+source .venv/bin/activate
+python3 headcheck.py --html people.html --company "Acme Corp"
 ```
 
 ---
@@ -337,6 +377,8 @@ Column detection is automatic and uses a two-tier strategy:
 2. **Weak keywords** — headers like `employee`, `staff`, `worker` are accepted only if their column contents actually look like human names. This prevents columns like `Employee ID` from being mistaken for the names column.
 3. **Content-based fallback** — if no header keyword is found, the column whose cells best match a human-name pattern is chosen.
 
+Fuzzy name matching uses a configurable cutoff (`_FUZZY_MATCH_CUTOFF = 85` in `headcheck/payroll.py`).
+
 **No reformatting required.** A sample file is included: `sample_payroll.csv`.
 
 ---
@@ -348,7 +390,7 @@ A security audit isn't a one-off exercise. Running HeadCheck monthly gives you a
 Each HeadCheck run produces a `.json` snapshot next to the HTML / PDF / XLSX outputs. Compare two of them:
 
 ```bash
-python headcheck.py diff reports/headcheck_acme_2026-03.json reports/headcheck_acme_2026-04.json
+python headcheck.py diff output/headcheck_acme_2026-03.json output/headcheck_acme_2026-04.json
 ```
 
 The diff classifies every profile into five buckets:
@@ -390,11 +432,14 @@ python headcheck.py
 # Main audit
 python headcheck.py --html people.html --company "Acme Corp"
 python headcheck.py --html people.html --company "Acme Corp" --payroll staff.xlsx
-python headcheck.py --html people.html --company "Acme Corp" --lang es --out ./reports
+python headcheck.py --html people.html --company "Acme Corp" --lang es --out ./output
 
 # Diff two snapshots
 python headcheck.py diff old.json new.json
 python headcheck.py diff old.json new.json --csv changes.csv --plain
+
+# Or as a Python module (equivalent to the above)
+python -m headcheck --html people.html --company "Acme Corp"
 ```
 
 **Main audit flags:**
@@ -405,8 +450,8 @@ python headcheck.py diff old.json new.json --csv changes.csv --plain
 | `--company` | No | `"Company"` | Company name for report headers |
 | `--payroll` | No | — | Payroll file (`.csv`, `.xlsx`, `.xls`) |
 | `--lang` | No | `en` | LinkedIn interface language: `en` `es` `fr` `de` `pt` `it` |
-| `--out` | No | `.` | Output directory for the report files |
-| `--debug` | No | off | Print extraction diagnostics (how many anchors found, photo states, skip reasons) |
+| `--out` | No | `./output` | Output directory for the report files (created if missing) |
+| `--debug` | No | off | Print extraction diagnostics |
 
 **Diff flags:**
 
@@ -431,14 +476,24 @@ result = run_headcheck(
     company="Acme Corp",
     payroll_path="staff.xlsx",   # optional
     lang="en",
-    out_dir="./reports",
+    out_dir="./output",
 )
 
 print(result["stats"])        # {'total': 96, 'red': 0, 'yellow': 33, 'green': 63, 'suspects_exported': 33}
-print(result["warnings"])     # list of export-quality messages
+print(result["warnings"])     # list of export-quality messages (plain sentences, no CLI indentation)
 print(result["outputs"])      # {'html': ..., 'pdf': ..., 'xlsx': ..., 'suspects_csv': ..., 'snapshot': ...}
 for profile in result["profiles"]:
     ...
+```
+
+As of 2.0.1, library functions raise `ValueError` instead of calling `sys.exit()` on bad input — you can catch and recover in notebooks, GUIs, and automation.
+
+```python
+try:
+    result = run_headcheck(html_path="people.html", company="Acme",
+                           payroll_path="bad_format.txt")
+except ValueError as e:
+    print(f"Bad input: {e}")
 ```
 
 Optionally pass a `progress=callback` to receive stage-by-stage updates:
@@ -464,11 +519,20 @@ export_diff_csv(diff, "changes.csv")
 
 The library functions do not print anything — the CLI wraps them with a progress callback for its own output. This keeps the library usable from GUIs, notebooks, or other automation.
 
+You can also import individual modules directly if you only need part of the pipeline:
+
+```python
+from headcheck.parsing import extract_profiles
+from headcheck.scoring import count_mutual, is_suspicious_name, RISK_GREEN_MIN
+from headcheck.payroll import load_payroll, cross_reference
+from headcheck.reports import generate_xlsx
+```
+
 ---
 
 ## Running the Tests
 
-The project includes a pytest suite (129 tests as of 1.6.0) that covers scoring, HTML parsing, payroll matching, multilingual mutual-connection detection, export-quality warnings, Excel output, interactive mode and snapshot diffing. It also includes regression tests for past bugs so they cannot silently come back.
+The project includes a pytest suite (129 tests as of 2.0.1) that covers scoring, HTML parsing, payroll matching, multilingual mutual-connection detection, export-quality warnings, Excel output, interactive mode and snapshot diffing. It also includes regression tests for past bugs so they cannot silently come back.
 
 ```bash
 pip install -r requirements-dev.txt
@@ -500,7 +564,7 @@ To get accurate mutual connection data, the export must be done by someone who:
 - Is **not** a page admin, and
 - Navigates to `linkedin.com/company/[company-slug]/people` from their **normal LinkedIn session**
 
-Any non-admin employee with connections to several colleagues will produce significantly better results. The more internal connections that person has, the more profiles will correctly appear as green.
+Any non-admin employee with connections to several colleagues will produce significantly better results.
 
 ---
 
@@ -530,7 +594,7 @@ Submit the request through LinkedIn's official support: [linkedin.com/help/linke
 > Note: you must have a confirmed company email address registered to your LinkedIn account to submit this request.
 
 **Step 2 — Report the individual profile**
-On the person's LinkedIn profile, click the **More** button (···) → **Report / Block** → select the appropriate reason (fake profile, incorrect information, etc.). LinkedIn will review and may remove the profile or the company association.
+On the person's LinkedIn profile, click the **More** button (···) → **Report / Block** → select the appropriate reason. LinkedIn will review and may remove the profile or the company association.
 
 **Step 3 — Be patient**
 LinkedIn support response times for these requests vary. If the association is clearly malicious, escalating via [@LinkedInHelp](https://twitter.com/LinkedInHelp) on Twitter/X can sometimes speed up the process.
@@ -557,7 +621,7 @@ LinkedIn support response times for these requests vary. If the association is c
 
 See [CHANGELOG.md](CHANGELOG.md) for the full list of changes per release.
 
-Current version: **1.6.0** — interactive wizard, Excel output, snapshot diff, library API, 129 tests. Recommended upgrade for all users.
+Current version: **2.0.1** — code-review pass over 2.0.0. PDF report now correctly distinguishes the three photo states. Library functions raise `ValueError` instead of calling `sys.exit()`. Employer-reference detection extended to 8 languages. Risk thresholds and warning thresholds turned into named constants. 129 tests passing.
 
 ---
 

@@ -102,7 +102,7 @@ class TestPlainWizard:
         result = _plain_wizard(print)
         assert result["company"] == "Company"
         assert result["lang"] == "en"
-        assert result["out_dir"] == "."
+        assert result["out_dir"] == "./output"
 
     def test_invalid_lang_falls_back_to_english(self, tmp_path, monkeypatch):
         html_file = tmp_path / "people.html"

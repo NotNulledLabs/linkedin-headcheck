@@ -10,6 +10,9 @@ venv/
 .coverage
 htmlcov/
 
+# Default output directory for HeadCheck reports
+output/
+
 # Reports contain personal data — do not commit
 headcheck_*.html
 headcheck_*.pdf
